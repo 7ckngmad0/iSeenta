@@ -1,7 +1,7 @@
 // Simulate content.js with a fake DOM/window/chrome and fake timers
 import fs from 'node:fs';
 const src = fs.readFileSync(new URL("../src/content.js", import.meta.url), 'utf8')
-  .replace(/import \{ MEET_CODE_RE \} from "\.\/config";/, 'const MEET_CODE_RE = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;');
+  .replace(/import \{ meetCodeFromPath \} from "\.\/config";/, 'const meetCodeFromPath = path => { const match = path.match(/([a-z]{3}-[a-z]{4}-[a-z]{3})/i); return match ? match[1].toLowerCase() : null; };');
 let now = 0, timers = [], tid = 0;
 const setTimeout_ = (fn, ms) => { const id = ++tid; timers.push({ id, at: now + ms, fn, every: 0 }); return id; };
 const setInterval_ = (fn, ms) => { const id = ++tid; timers.push({ id, at: now + ms, fn, every: ms }); return id; };
@@ -30,6 +30,7 @@ const chrome = { runtime: { sendMessage: async m => {
   return {};
 } } };
 const document = {
+  getElementById: () => ({ remove() {} }),
   get visibilityState() { return state.hidden ? 'hidden' : 'visible'; },
   hasFocus: () => state.focus,
   querySelector: () => state.inCall ? {} : null,
@@ -59,7 +60,7 @@ state.focus = false; fire('blur'); state.focus = true; await advance(200); fire(
 check('short blur < debounce -> nothing', []);
 state.hidden = true; state.focus = false; fire('visibilitychange'); await advance(50); check('tab hidden -> AWAY immediately', ['AWAY(visible=false)']);
 state.hidden = false; state.focus = true; fire('visibilitychange'); await advance(50); check('tab back -> RETURNED', ['RETURNED']);
-state.inCall = false; await advance(1100); check('hang up (leave button gone) -> LEFT', ['LEFT']);
+state.inCall = false; await advance(6100); check('hang up (leave button gone) -> LEFT after grace period', ['LEFT']);
 state.inCall = true; await advance(1100); check('rejoin -> JOINED', ['JOINED']);
 state.path = '/xyz-wxyz-abc'; await advance(1100); check('switch room -> LEFT + JOINED', ['LEFT', 'JOINED']);
 fire('pagehide'); fire('beforeunload'); await advance(10); check('pagehide+beforeunload -> single LEFT', ['LEFT']);

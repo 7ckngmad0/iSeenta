@@ -137,3 +137,17 @@
 /* ===== HISTORY PAGE TABS: even space above and below ===== */
 .history-pagination { padding: 16px 26px; }
 @media (max-width: 699px) { .history-pagination { padding: 14px 18px; } }
+
+/* Session notes stay attached to their recap and remain keyboard accessible. */
+.hx-note-toggle { justify-self: start; min-height: 28px; padding: 3px 7px; color: var(--muted-foreground); font-size: 12px; }
+.hx-note-toggle svg { width: 14px; height: 14px; }
+.hx-session-note { margin: 2px 0 0; color: var(--foreground); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.hx-note-editor { display: grid; gap: 8px; margin-top: 7px; padding: 11px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
+.hx-note-editor > label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; }
+.hx-note-editor > label span, .hx-note-actions > span { color: var(--muted-foreground); font-size: 11px; font-weight: 400; }
+.hx-note-editor textarea { width: 100%; min-height: 54px; resize: vertical; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; font-size: 12px; }
+.hx-note-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.hx-note-actions > span { margin-right: auto; font-variant-numeric: tabular-nums; }
+.skip-link { position: fixed; z-index: 1000; top: 8px; left: 8px; transform: translateY(-160%); padding: 10px 14px; border-radius: 8px; background: var(--cream); color: var(--ink); font-weight: 700; }
+.skip-link:focus { transform: translateY(0); }
+#top:focus { outline: none; }

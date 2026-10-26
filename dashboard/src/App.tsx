@@ -8,10 +8,11 @@ import { useRef } from "react";
 import { auth, db, googleProvider } from "./firebase";
 import { Wordmark } from "./Logo";
 import { playSound, setSoundsEnabled, soundsEnabled } from "./sounds";
+import { matchesSessionHistorySearch, normalizeSessionNote } from "./sessionNotes";
 
 type EventType = "JOINED" | "RETURNED" | "AWAY" | "LEFT" | "IDLE" | "LOCKED" | "ACTIVE" | "TABS_UPDATED" | "HEARTBEAT";
 type TrackerEvent = { id: string; email?: string; student?: string; uid?: string; type: EventType; time: number; tabCount?: number; meetingCode?: string; sessionId?: string; receivedAt?: { seconds?: number; nanoseconds?: number; toMillis?: () => number } | null };
-type ClassSession = { id: string; meetingCode: string; status: "active" | "paused" | "ended"; startedAtMs: number; elapsedMs: number; pausedAtMs?: number; teacherUid?: string; endedAt?: { seconds?: number; nanoseconds?: number; toMillis?: () => number } | null };
+type ClassSession = { id: string; meetingCode: string; status: "active" | "paused" | "ended"; startedAtMs: number; elapsedMs: number; pausedAtMs?: number; teacherUid?: string; sessionNote?: string; endedAt?: { seconds?: number; nanoseconds?: number; toMillis?: () => number } | null };
 type SessionDocument = { status?: string; startedAtMs?: number; elapsedMs?: number; pausedAtMs?: number | null; teacherUid?: string };
 type Status = "Active" | "Idle" | "Away" | "Not detected" | "Left";
 type Student = { name: string; email: string; uid: string; status: Status; focusMs: number; tabCount: number | null; lastEvent: string; lastTime: string };
@@ -148,7 +149,7 @@ const activityVerdict = (activity: ClassActivity, response: ActivityResponse | u
 };
 
 // Build an Excel workbook with meeting, activity, and response details on separate sheets.
-async function downloadSessionWorkbook(recap: SessionRecap, activities: ClassActivity[] = [], responsesByActivity: Record<string, ActivityResponse[]> = {}, note = "") {
+async function downloadSessionWorkbook(recap: SessionRecap, activities: ClassActivity[] = [], responsesByActivity: Record<string, ActivityResponse[]> = {}, sessionNote = "", exportNotice = "") {
   // Use the universal Blob writer so extension CSP / Worker URL handling cannot
   // block a recap download from the packaged dashboard.
   const { default: writeExcelFile } = await import("write-excel-file/universal");
@@ -176,7 +177,8 @@ async function downloadSessionWorkbook(recap: SessionRecap, activities: ClassAct
     ["Ended", stamp(recap.endedAtMs)], ["Duration", formatDuration(recap.elapsedMs)],
     ["Students in report", rows.length], ["Questions asked", rounds.length],
     ["Average focus share (%)", averageFocus],
-    ...(note ? [["Note", note] as (string | number)[]] : [])
+    ...(sessionNote ? [["Session note", sessionNote] as (string | number)[]] : []),
+    ...(exportNotice ? [["Export note", exportNotice] as (string | number)[]] : [])
   ];
   const activityHeaders = ["Student", "Email", "Final status", "Time in Meet (min)", "Focused (min)", "Away (min)", "Idle or locked (min)", "Focus share (%)", "Tab switches", "Times away"];
   const activityRows: (string | number)[][] = [];
@@ -440,6 +442,10 @@ export default function App() {
   const [downloadedRecaps, setDownloadedRecaps] = useState<string[]>(() => { try { const stored = JSON.parse(localStorage.getItem("iseenta-downloaded-recaps") ?? "[]"); return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : []; } catch { return []; } });
   const [historyPage, setHistoryPage] = useState(0);
   const [historySearch, setHistorySearch] = useState("");
+  const [editingNoteSessionId, setEditingNoteSessionId] = useState<string | null>(null);
+  const [sessionNoteDraft, setSessionNoteDraft] = useState("");
+  const [savingSessionNote, setSavingSessionNote] = useState(false);
+  const [sessionNoteMessage, setSessionNoteMessage] = useState("");
   const [historySort, setHistorySort] = useState<"newest" | "oldest">("newest");
   const [historyFilter, setHistoryFilter] = useState<"all" | "soon">("all");
   const [historyView, setHistoryView] = useState<"grid" | "list">("grid");
@@ -818,7 +824,7 @@ export default function App() {
   const dayMs = 24 * 60 * 60 * 1000;
   const daysLeftOf = (session: { endedAtMs: number }) => Math.max(0, Math.ceil((session.endedAtMs + retentionMs - now) / dayMs));
   const filteredHistory = retainedSessions
-    .filter(session => session.meetingCode.toLowerCase().includes(historySearch.trim().toLowerCase()))
+    .filter(session => matchesSessionHistorySearch(session, historySearch))
     .filter(session => historyFilter === "all" || daysLeftOf(session) <= 7)
     .sort((a, b) => historySort === "newest" ? b.endedAtMs - a.endedAtMs : a.endedAtMs - b.endedAtMs);
   const historyPageCount = Math.ceil(filteredHistory.length / historyPerPage);
@@ -1092,7 +1098,7 @@ export default function App() {
       const recap: SessionRecap = { session, students: toStudents(sessionEvents, session.endedAtMs), events: sessionEvents, elapsedMs: session.elapsedMs, endedAtMs: session.endedAtMs };
       let rounds: ClassActivity[] = [];
       const answers: Record<string, ActivityResponse[]> = {};
-      let note = "";
+      let exportWarning = "";
       try {
         const roundSnapshot = await getDocs(query(collection(db, "classActivities"), where("sessionId", "==", session.id), where("teacherUid", "==", user?.uid ?? "")));
         rounds = roundSnapshot.docs.map(item => ({ ...item.data(), id: item.id } as ClassActivity));
@@ -1103,14 +1109,28 @@ export default function App() {
       } catch (error) {
         console.warn("Could not load question results for this recap", error);
         rounds = [];
-        note = "Question results could not be loaded for this recap.";
+        exportWarning = "Question results could not be loaded for this recap.";
       }
-      await downloadSessionWorkbook(recap, rounds, answers, note);
+      await downloadSessionWorkbook(recap, rounds, answers, session.sessionNote ?? "", exportWarning);
     } catch (error) {
       console.error("Could not export retained session", error);
       const detail = error instanceof Error ? error.message : String(error);
       setHistoryError(`Could not export this recap: ${detail || "activity may have expired or access may be temporarily unavailable."}`);
     } finally { setExportingSessionId(null); }
+  };
+  const saveSessionNote = async (session: ClassSession & { endedAtMs: number }) => {
+    const note = normalizeSessionNote(sessionNoteDraft);
+    setSavingSessionNote(true);
+    setSessionNoteMessage("");
+    try {
+      await updateDoc(doc(db, "sessions", session.id), { sessionNote: note });
+      setRetainedSessions(current => current.map(item => item.id === session.id ? { ...item, sessionNote: note } : item));
+      setEditingNoteSessionId(null);
+      setSessionNoteMessage(`Note saved for ${session.meetingCode}.`);
+    } catch (error) {
+      console.error("Could not save session note", error);
+      setSessionNoteMessage("Could not save the note. Check your connection and try again.");
+    } finally { setSavingSessionNote(false); }
   };
   const acknowledgeAfkRequest = async (notice: AfkNotice) => {
     setAcknowledgingRequestId(notice.id);
@@ -1187,6 +1207,7 @@ export default function App() {
   ] : [];
 
   return <div className="app-shell">
+    <a className="skip-link" href="#top">Skip to main content</a>
     <header className={`topbar ${navPinned ? "scrolled" : ""}`}>
       <div className="brand-block"><Wordmark /><span className="brand-caption">Class activity tracker</span></div>
       <nav className="topnav" aria-label="Dashboard navigation">
@@ -1203,7 +1224,7 @@ export default function App() {
         <button type="button" className={`btn btn-ghost btn-icon theme-toggle${dark ? " is-dark" : ""}`} onClick={toggleTheme} aria-label={dark ? "Switch to light theme" : "Switch to dark theme"} title={dark ? "Switch to light theme" : "Switch to dark theme"}><span className="theme-orb" aria-hidden="true" /></button>
       </nav>
     </header>
-    <main id="top" className="workspace">
+    <main id="top" className="workspace" tabIndex={-1}>
       <div className="page-intro"><div><h1>{showHistoryPage ? "Every session, on record." : "Your class, at a glance."}</h1><p>{showHistoryPage ? "Recaps are kept for 30 days. Download one to keep it for good." : "A little visibility. A more connected classroom."}</p></div></div>
 
       {!showHistoryPage && <>
@@ -1512,7 +1533,7 @@ export default function App() {
             <button type="button" className="btn btn-outline history-refresh" onClick={() => { setHistoryLoaded(false); void loadRetainedSessions(); }} disabled={!user || historyLoading}><RefreshCw className={historyLoading ? "spin" : ""} />{historyLoading ? "Refreshing" : "Refresh"}</button>
           </div>
           <div className="hx-toolbar">
-            <label className="search-box hx-search"><Search size={16} /><input aria-label="Search by meeting code" placeholder="Search meeting code" value={historySearch} onChange={event => { setHistorySearch(event.target.value); setHistoryPage(0); }} />{historySearch && <button type="button" className="btn btn-ghost btn-icon" aria-label="Clear search" onClick={() => setHistorySearch("")}><X /></button>}</label>
+            <label className="search-box hx-search"><Search size={16} /><input aria-label="Search meeting code or session note" placeholder="Search meeting or note" value={historySearch} onChange={event => { setHistorySearch(event.target.value); setHistoryPage(0); }} />{historySearch && <button type="button" className="btn btn-ghost btn-icon" aria-label="Clear search" onClick={() => setHistorySearch("")}><X /></button>}</label>
             <div className="segmented" role="group" aria-label="Filter sessions" style={{ "--tabs": 2, "--i": historyFilter === "all" ? 0 : 1 } as CSSProperties}>
               <span className="segmented-indicator" aria-hidden="true" />
               <button type="button" className="btn btn-ghost" aria-pressed={historyFilter === "all"} onClick={() => { setHistoryFilter("all"); setHistoryPage(0); }}>All</button>
@@ -1546,11 +1567,19 @@ export default function App() {
                   <div className="hx-card-main">
                     <span className="hx-code"><Video size={14} />{session.meetingCode}</span>
                     <p className="hx-meta">{ended.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · {formatDuration(session.elapsedMs)} · <span className={`hx-expiry${daysLeft <= 7 ? " soon" : ""}`} title={`Deleted on ${formatDate(expiresAt)}`}>{daysLeft === 0 ? "deleted today" : `${daysLeft}d left`}</span></p>
+                    {session.sessionNote && <p className="hx-session-note">{session.sessionNote}</p>}
+                    <button type="button" className="btn btn-ghost hx-note-toggle" onClick={() => { setEditingNoteSessionId(editingNoteSessionId === session.id ? null : session.id); setSessionNoteDraft(session.sessionNote ?? ""); setSessionNoteMessage(""); }} aria-expanded={editingNoteSessionId === session.id} aria-label={`${session.sessionNote ? "Edit" : "Add"} note for ${session.meetingCode}`}><Pencil size={15} /><span>{session.sessionNote ? "Edit note" : "Add note"}</span></button>
+                    {editingNoteSessionId === session.id && <form className="hx-note-editor" onSubmit={event => { event.preventDefault(); void saveSessionNote(session); }}>
+                      <label htmlFor={`session-note-${session.id}`}>Session note <span>Optional · included in Excel recap</span></label>
+                      <textarea id={`session-note-${session.id}`} value={sessionNoteDraft} maxLength={160} rows={2} aria-describedby={`session-note-count-${session.id}`} onChange={event => setSessionNoteDraft(event.target.value)} onKeyDown={event => { if (event.key === "Escape") setEditingNoteSessionId(null); }} placeholder="Add a topic or short class summary" />
+                      <div className="hx-note-actions"><span id={`session-note-count-${session.id}`}>{sessionNoteDraft.length}/160</span><button type="button" className="btn btn-ghost" onClick={() => setEditingNoteSessionId(null)}>Cancel</button><button type="submit" className="btn btn-outline" disabled={savingSessionNote}>{savingSessionNote ? "Saving…" : "Save note"}</button></div>
+                    </form>}
                   </div>
                   <button type="button" className="btn btn-outline hx-download retention-export" onClick={() => void exportRetainedSession(session)} disabled={Boolean(exportingSessionId)} aria-label={`Download Excel recap for session ${session.meetingCode}, ended ${formatDate(session.endedAtMs)}`}>{exportingSessionId === session.id ? <><span className="loading-dot" aria-hidden="true" />Preparing</> : <><Download />Excel</>}</button>
                 </article>;
               })}</div>
             </section>)}</div>}
+          <p className="sr-only" role="status" aria-live="polite">{sessionNoteMessage}</p>
           {historyPageCount > 1 && <nav className="roster-pagination history-pagination" aria-label="Session history pages">{Array.from({ length: historyPageCount }, (_, page) => {
             const start = page * historyPerPage + 1;
             const end = Math.min((page + 1) * historyPerPage, filteredHistory.length);

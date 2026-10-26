@@ -13,12 +13,13 @@ const L = {};
 const ev = n => ({ addListener: f => (L[n] = f) });
 let mockTab = null;
 const chrome = {
-  storage: { local: {
+  storage: { onChanged: ev('storageChanged'), local: {
     get: async k => Object.fromEntries([].concat(k).map(x => [x, store[x]])),
     set: async o => Object.assign(store, o),
     remove: async k => [].concat(k).forEach(x => delete store[x])
   } },
   runtime: { onMessage: ev('msg'), onConnect: ev('connect'), onStartup: ev('startup'), onInstalled: ev('installed'), getURL: p => p },
+  notifications: { onClicked: ev('notificationClicked'), create: async () => {} },
   tabs: { onRemoved: ev('removed'), onUpdated: ev('updated'), get: async () => { if (!mockTab) throw 0; return mockTab; }, query: async () => [{}, {}, {}], create: async () => {} },
   alarms: { onAlarm: ev('alarm'), create() {} },
   idle: { setDetectionInterval() {}, onStateChanged: ev('idle') }
@@ -29,12 +30,13 @@ const deps = {
   query: (...args) => args,
   where: (...args) => args,
   getDocs: async () => ({ docs: activeSessionDocs }),
+  onSnapshot: () => () => {},
   setDoc: async (_, d) => {
     writtenDocs.push(d);
     written.push(`${d.type}:${d.meetingCode}`);
   },
   serverTimestamp: () => 'server-time',
-  auth: { authStateReady: async () => {}, currentUser: { uid: 'u1' } },
+  auth: { authStateReady: async () => {}, onAuthStateChanged() {}, currentUser: { uid: 'u1' } },
   db: 0, signInWithGoogle: async () => null, signOutGoogle: async () => {}
 };
 const navigator = { onLine: true };

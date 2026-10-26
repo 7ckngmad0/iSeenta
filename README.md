@@ -51,3 +51,5 @@ npm --prefix dashboard run dev
 For full feature use, load the built extension; the dashboard is packaged inside it.
 
 Keep the professor allowlists in `src/config.js`, `dashboard/src/App.tsx`, and `firestore.rules` aligned. Firestore rules—not the dashboard allowlist—enforce access.
+
+For project data handling and the meaning of exported estimates, see [Privacy and exports](docs/PRIVACY-AND-EXPORT.md). The repeatable keyboard and screen-reader release check is in the [Accessibility review](docs/ACCESSIBILITY-REVIEW.md). To run the automated checks, see [Testing and troubleshooting](docs/TESTING-AND-TROUBLESHOOTING.md).

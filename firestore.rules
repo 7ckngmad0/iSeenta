@@ -121,15 +121,26 @@ service cloud.firestore {
       allow update: if isProfessor()
         && resource.data.teacherUid == request.auth.uid
         && request.resource.data.teacherUid == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'elapsedMs', 'pausedAtMs', 'startedAtMs',
-          'updatedAt', 'endedAt'
-        ])
-        && request.resource.data.elapsedMs is int
-        && request.resource.data.elapsedMs >= 0
-        && request.resource.data.elapsedMs >= resource.data.elapsedMs
-        && request.resource.data.updatedAt == request.time
-        && validSessionTransition();
+        && (
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'elapsedMs', 'pausedAtMs', 'startedAtMs',
+              'updatedAt', 'endedAt'
+            ])
+            && request.resource.data.elapsedMs is int
+            && request.resource.data.elapsedMs >= 0
+            && request.resource.data.elapsedMs >= resource.data.elapsedMs
+            && request.resource.data.updatedAt == request.time
+            && validSessionTransition()
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sessionNote'])
+            && resource.data.status == 'ended'
+            && request.resource.data.status == 'ended'
+            && request.resource.data.sessionNote is string
+            && request.resource.data.sessionNote.size() <= 160
+          )
+        );
 
       allow delete: if false;
     }

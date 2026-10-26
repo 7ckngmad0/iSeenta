@@ -80,6 +80,10 @@ The professor sees the answer you submit and whether it matches. If you do not s
 
 ## 4. Optional setup
 
+### Troubleshooting and checks
+
+For local build and test commands, Java/Firebase CLI setup, permission errors, and sign-in troubleshooting, see [Testing and troubleshooting](docs/TESTING-AND-TROUBLESHOOTING.md). Changes to `firestore.rules` must be reviewed and published separately from rebuilding the extension.
+
 ### Account chooser in the dashboard, Brave, and Edge
 
 Chrome's normal extension sign-in does not require this. To use the dashboard's explicit Google account chooser, or to sign in from Brave/Edge:
