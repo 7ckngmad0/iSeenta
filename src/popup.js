@@ -45,6 +45,37 @@ let activityCountdownTimer = null;
 let currentClassActivity = null;
 let currentActivityResponse = null;
 let renderedChoiceActivityId = "";
+// Like dashboard notifications: once time is up, linger briefly, animate out, then stay gone.
+const activityCooldownMs = 5000;
+const activityExitMs = 280;
+const dismissedActivityIds = new Set();
+let activityDismissTimer = null;
+let activityExitTimer = null;
+
+function clearActivityDismissTimers() {
+  if (activityDismissTimer !== null) clearTimeout(activityDismissTimer);
+  if (activityExitTimer !== null) clearTimeout(activityExitTimer);
+  activityDismissTimer = null;
+  activityExitTimer = null;
+}
+
+function scheduleActivityDismiss(activity) {
+  if (activityDismissTimer !== null || activityExitTimer !== null) return;
+  const id = activity.id;
+  activityDismissTimer = setTimeout(() => {
+    activityDismissTimer = null;
+    if (currentClassActivity?.id !== id) return;
+    $("class-activity").classList.add("exiting");
+    activityExitTimer = setTimeout(() => {
+      activityExitTimer = null;
+      dismissedActivityIds.add(id);
+      if (currentClassActivity?.id !== id) return;
+      currentClassActivity = null;
+      $("class-activity").classList.remove("exiting");
+      renderClassActivity();
+    }, activityExitMs);
+  }, activityCooldownMs);
+}
 
 function setActivityFeedback(text, kind = "") {
   const feedback = $("activity-feedback");
@@ -55,10 +86,11 @@ function setActivityFeedback(text, kind = "") {
 function renderClassActivity() {
   const activity = currentClassActivity;
   $("class-activity").hidden = !activity;
-  if (!activity) return;
+  if (!activity) { clearActivityDismissTimers(); $("class-activity").classList.remove("exiting"); return; }
 
   const remainingMs = Math.max(0, Number(activity.expiresAtMs) - Date.now());
   const expired = remainingMs <= 0;
+  if (expired) scheduleActivityDismiss(activity);
   const multipleChoice = activity.responseType === "multiple-choice";
   const prompt = activity.question || activity.word || "Class question";
   $("class-activity-title").textContent = multipleChoice ? "Quick class poll" : "Quick class question";
@@ -118,6 +150,8 @@ function watchClassActivity(profile, sessionId) {
   if (activityCountdownTimer !== null) clearInterval(activityCountdownTimer);
   activityCountdownTimer = null;
   activityWatchKey = key;
+  dismissedActivityIds.clear();
+  clearActivityDismissTimers();
   currentClassActivity = null;
   currentActivityResponse = null;
   $("activity-answer").value = "";
@@ -137,12 +171,15 @@ function watchClassActivity(profile, sessionId) {
     if (activityWatchKey !== key) return;
     const activity = snapshot.docs
         .map(item => ({ id: item.id, ...item.data() }))
+        .filter(item => !dismissedActivityIds.has(item.id))
         .sort((a, b) => Number(b.startedAtMs) - Number(a.startedAtMs))[0] ?? null;
 
     if (activity?.id !== currentClassActivity?.id) {
       activityResponseUnsubscribe?.();
       activityResponseUnsubscribe = null;
       currentActivityResponse = null;
+      clearActivityDismissTimers();
+      $("class-activity").classList.remove("exiting");
       $("activity-answer").value = "";
       renderedChoiceActivityId = "";
       $("activity-options").replaceChildren();

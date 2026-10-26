@@ -299,6 +299,9 @@ strong { font-weight: 600; }
 .privacy-list svg { transition: color .2s; }
 
 .class-activity { display: grid; gap: 10px; margin-top: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); }
+.class-activity.exiting { pointer-events: none; animation: activity-exit .28s ease-in forwards; overflow: hidden; }
+@keyframes activity-exit { to { opacity: 0; transform: translateY(-8px) scale(.99); max-height: 0; padding-block: 0; margin-top: 0; border-width: 0; } }
+@media (prefers-reduced-motion: reduce) { .class-activity.exiting { animation-duration: .01ms; } }
 .activity-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .activity-heading strong { font-size: 13px; }
 .activity-countdown { color: var(--muted-foreground); font-size: 11px; font-variant-numeric: tabular-nums; }
