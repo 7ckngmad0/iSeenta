@@ -1447,7 +1447,7 @@ export default function App() {
           <div className="hs-retention" aria-label="Recap retention">
             <div className="hs-retention-top">
               {historyLoaded && historyByDate.length > 0
-                ? <p className="hs-expiry-head"><span>Next recap expires</span><span className="hs-expiry-date"><b className="number">{nextExpiryDays}</b> {nextExpiryDays === 1 ? "day" : "days"} · {nextExpiryDate}</span></p>
+                ? <p className="hs-expiry-head"><span>Next recap expires</span><span className="hs-expiry-date"><b>{nextExpiryDays}</b> {nextExpiryDays === 1 ? "day" : "days"} · {nextExpiryDate}</span></p>
                 : <p className="hs-expiry-head">{historyLoaded ? "Recaps are kept for 30 days" : "Checking recap expiry"}</p>}
               <p className="hs-retention-note">{historyLoaded && historyByDate.length ? (expiringSoonCount ? `${expiringSoonCount} expire this week` : "None expire this week") : "No saved recaps yet"}</p>
             </div>
