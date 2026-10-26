@@ -152,6 +152,8 @@
 .hx-note-editor textarea { width: 100%; min-height: 54px; resize: vertical; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; font-size: 12px; }
 .hx-note-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
 .hx-note-actions > span { margin-right: auto; font-variant-numeric: tabular-nums; }
+.hx-note-actions > span.near-limit { color: var(--idle-text); }
+.hx-note-editor .btn:disabled { opacity: .5; cursor: not-allowed; }
 /* Opening the note editor grows only its own card, never the neighbouring card in the row. */
 .hx-grid { align-items: start; }
 .hx-card { align-content: start; }
