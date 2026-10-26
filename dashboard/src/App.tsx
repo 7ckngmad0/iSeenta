@@ -366,6 +366,7 @@ function useCountUp(target: number, duration = 650) {
 
 export default function App() {
   const detailDialog = useRef<HTMLDialogElement>(null);
+  const sessionNoteDialog = useRef<HTMLDialogElement>(null);
   const afkRequestsRef = useRef<AfkNotice[]>([]);
   const notificationTimeoutsRef = useRef(new Map<string, number>());
   const notificationRemovalTimeoutsRef = useRef(new Map<string, number>());
@@ -442,6 +443,7 @@ export default function App() {
   const [downloadedRecaps, setDownloadedRecaps] = useState<string[]>(() => { try { const stored = JSON.parse(localStorage.getItem("iseenta-downloaded-recaps") ?? "[]"); return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : []; } catch { return []; } });
   const [historyPage, setHistoryPage] = useState(0);
   const [historySearch, setHistorySearch] = useState("");
+  const [viewingSessionNote, setViewingSessionNote] = useState<{ meetingCode: string; note: string } | null>(null);
   const [editingNoteSessionId, setEditingNoteSessionId] = useState<string | null>(null);
   const [sessionNoteDraft, setSessionNoteDraft] = useState("");
   const [savingSessionNote, setSavingSessionNote] = useState(false);
@@ -572,6 +574,12 @@ export default function App() {
     if (selectedStudentEmail && !dialog.open) dialog.showModal();
     else if (!selectedStudentEmail && dialog.open) dialog.close();
   }, [selectedStudentEmail]);
+  useEffect(() => {
+    const dialog = sessionNoteDialog.current;
+    if (!dialog) return;
+    if (viewingSessionNote && !dialog.open) dialog.showModal();
+    else if (!viewingSessionNote && dialog.open) dialog.close();
+  }, [viewingSessionNote]);
   useEffect(() => { if (showHistoryPage && user) void loadRetainedSessions(); }, [showHistoryPage, user?.uid]);
   // Local preview only (?mockStudents=40): synthetic recaps so the history page can be reviewed without Firestore.
   useEffect(() => {
@@ -1064,7 +1072,7 @@ export default function App() {
         const data = item.data();
         const endedAtMs = timestampMillis(data.endedAt);
         if (data.status !== "ended" || !endedAtMs || endedAtMs < cutoff) return [];
-        return [{ id: item.id, meetingCode: String(data.meetingCode ?? "Unknown Meet"), status: "ended" as const, startedAtMs: Number(data.startedAtMs ?? 0), elapsedMs: Number(data.elapsedMs ?? 0), teacherUid: String(data.teacherUid ?? ""), endedAt: data.endedAt, endedAtMs }];
+        return [{ id: item.id, meetingCode: String(data.meetingCode ?? "Unknown Meet"), status: "ended" as const, startedAtMs: Number(data.startedAtMs ?? 0), elapsedMs: Number(data.elapsedMs ?? 0), teacherUid: String(data.teacherUid ?? ""), sessionNote: typeof data.sessionNote === "string" ? data.sessionNote : "", endedAt: data.endedAt, endedAtMs }];
       }).sort((a, b) => b.endedAtMs - a.endedAtMs);
       setRetainedSessions(sessions);
       setHistoryPage(0);
@@ -1576,9 +1584,14 @@ export default function App() {
                   <div className="hx-date" aria-hidden="true"><span className="hx-month">{ended.toLocaleDateString([], { month: "short" })}</span><span className="hx-day number">{ended.getDate()}</span><span className="hx-weekday">{ended.toLocaleDateString([], { weekday: "short" })}</span></div>
                   <div className="hx-card-main">
                     <span className="hx-code"><Video size={14} />{session.meetingCode}</span>
-                    <p className="hx-meta">{ended.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · {formatDuration(session.elapsedMs)} · <span className={`hx-expiry${daysLeft <= 7 ? " soon" : ""}`} title={`Deleted on ${formatDate(expiresAt)}`}>{daysLeft === 0 ? "deleted today" : `${daysLeft}d left`}</span></p>
-                    {session.sessionNote && <p className="hx-session-note" title={session.sessionNote}>{session.sessionNote}</p>}
-                    <button type="button" className="btn btn-ghost hx-note-toggle" onClick={() => { setEditingNoteSessionId(editingNoteSessionId === session.id ? null : session.id); setSessionNoteDraft(session.sessionNote ?? ""); setSessionNoteMessage(""); }} aria-expanded={editingNoteSessionId === session.id} aria-label={`${session.sessionNote ? "Edit" : "Add"} note for ${session.meetingCode}`}><Pencil size={15} /><span>{session.sessionNote ? "Edit note" : "Add note"}</span></button>
+                    <div className="hx-session-info">
+                      <p className="hx-meta"><span>{ended.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · {formatDuration(session.elapsedMs)}</span><span className={`hx-expiry${daysLeft <= 7 ? " soon" : ""}`} title={`Deleted on ${formatDate(expiresAt)}`}>{daysLeft === 0 ? "deleted today" : `${daysLeft}d left`}</span></p>
+                      {session.sessionNote && session.sessionNote.length <= 72 && <p className="hx-session-note">{session.sessionNote}</p>}
+                      <div className="hx-note-links">
+                        {session.sessionNote && session.sessionNote.length > 72 && <button type="button" className="btn btn-ghost hx-note-view" aria-haspopup="dialog" onClick={() => setViewingSessionNote({ meetingCode: session.meetingCode, note: session.sessionNote ?? "" })}><BookOpen size={14} /><span>View note</span></button>}
+                        <button type="button" className="btn btn-ghost hx-note-toggle" onClick={() => { setEditingNoteSessionId(editingNoteSessionId === session.id ? null : session.id); setSessionNoteDraft(session.sessionNote ?? ""); setSessionNoteMessage(""); }} aria-expanded={editingNoteSessionId === session.id} aria-label={`${session.sessionNote ? "Edit" : "Add"} note for ${session.meetingCode}`}><Pencil size={15} /><span>{session.sessionNote ? "Edit note" : "Add note"}</span></button>
+                      </div>
+                    </div>
                   </div>
                   <button type="button" className="btn btn-outline hx-download retention-export" onClick={() => void exportRetainedSession(session)} disabled={Boolean(exportingSessionId)} aria-label={`Download Excel recap for session ${session.meetingCode}, ended ${formatDate(session.endedAtMs)}`}>{exportingSessionId === session.id ? <><span className="loading-dot" aria-hidden="true" />Preparing</> : <><Download />Excel</>}</button>
                   {editingNoteSessionId === session.id && <form className="hx-note-editor" role="group" aria-label={`Note for ${session.meetingCode}`} onSubmit={event => { event.preventDefault(); void saveSessionNote(session); }}>
@@ -1602,6 +1615,13 @@ export default function App() {
       <footer className="page-footer"><span className="footer-note"><LockKeyhole />Only Meet visibility, idle signals and tab counts are shared.</span><span className="footer-note retention-note"><Info />30-day retention: automatic cleanup runs daily after the Firebase function is deployed.</span><span>Seenta for Polytechnic University of the Philippines</span></footer>
     </main>
 
+    <dialog ref={sessionNoteDialog} className="session-note-dialog" aria-labelledby="session-note-dialog-title" onClose={() => setViewingSessionNote(null)} onClick={event => { if (event.target === event.currentTarget) sessionNoteDialog.current?.close(); }}>
+      {viewingSessionNote && <div className="session-note-dialog-inner">
+        <div className="session-note-dialog-head"><div><h2 id="session-note-dialog-title">Session note</h2><p>{viewingSessionNote.meetingCode}</p></div><button type="button" className="btn btn-ghost btn-icon" aria-label="Close session note" onClick={() => sessionNoteDialog.current?.close()}><X /></button></div>
+        <p className="session-note-dialog-copy">{viewingSessionNote.note}</p>
+        <div className="session-note-dialog-actions"><button type="button" className="btn btn-outline" onClick={() => sessionNoteDialog.current?.close()}>Close</button></div>
+      </div>}
+    </dialog>
     <dialog ref={detailDialog} className="student-drawer" aria-labelledby="student-detail-title" onClose={() => setSelectedStudentEmail(null)} onClick={event => { if (event.target === event.currentTarget) detailDialog.current?.close(); }}>
       {selectedStudent && activityStats && <div className="drawer-inner">
         <button type="button" className="btn btn-ghost btn-icon drawer-close" onClick={() => detailDialog.current?.close()} aria-label="Close student details" title="Close student details"><X /></button>
