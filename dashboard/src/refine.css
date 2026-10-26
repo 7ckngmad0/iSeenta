@@ -183,3 +183,10 @@ dialog.session-note-dialog::backdrop { background: color-mix(in oklch, var(--ove
 .skip-link { position: fixed; z-index: 1000; top: 8px; left: 8px; transform: translateY(-160%); padding: 10px 14px; border-radius: 8px; background: var(--cream); color: var(--ink); font-weight: 700; }
 .skip-link:focus { transform: translateY(0); }
 #top:focus { outline: none; }
+
+/* "30d left" ends where the "Edit note" text ends. The info block is as wide as the text of the
+   "View note + Edit note" row (165px with Figtree), and the meta line spans it, so the expiry
+   sits in the same place on every card, with or without a note. */
+.hx-session-info { width: max-content; min-width: 165px; max-width: 100%; }
+.hx-meta { width: auto; margin-right: 0; }
+.hx-session-info .hx-note-links { width: 0; min-width: 100%; }
