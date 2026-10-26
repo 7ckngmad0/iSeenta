@@ -1569,13 +1569,13 @@ export default function App() {
                     <p className="hx-meta">{ended.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · {formatDuration(session.elapsedMs)} · <span className={`hx-expiry${daysLeft <= 7 ? " soon" : ""}`} title={`Deleted on ${formatDate(expiresAt)}`}>{daysLeft === 0 ? "deleted today" : `${daysLeft}d left`}</span></p>
                     {session.sessionNote && <p className="hx-session-note">{session.sessionNote}</p>}
                     <button type="button" className="btn btn-ghost hx-note-toggle" onClick={() => { setEditingNoteSessionId(editingNoteSessionId === session.id ? null : session.id); setSessionNoteDraft(session.sessionNote ?? ""); setSessionNoteMessage(""); }} aria-expanded={editingNoteSessionId === session.id} aria-label={`${session.sessionNote ? "Edit" : "Add"} note for ${session.meetingCode}`}><Pencil size={15} /><span>{session.sessionNote ? "Edit note" : "Add note"}</span></button>
-                    {editingNoteSessionId === session.id && <form className="hx-note-editor" onSubmit={event => { event.preventDefault(); void saveSessionNote(session); }}>
-                      <label htmlFor={`session-note-${session.id}`}>Session note <span>Optional · included in Excel recap</span></label>
-                      <textarea id={`session-note-${session.id}`} value={sessionNoteDraft} maxLength={160} rows={2} aria-describedby={`session-note-count-${session.id}`} onChange={event => setSessionNoteDraft(event.target.value)} onKeyDown={event => { if (event.key === "Escape") setEditingNoteSessionId(null); }} placeholder="Add a topic or short class summary" />
-                      <div className="hx-note-actions"><span id={`session-note-count-${session.id}`}>{sessionNoteDraft.length}/160</span><button type="button" className="btn btn-ghost" onClick={() => setEditingNoteSessionId(null)}>Cancel</button><button type="submit" className="btn btn-outline" disabled={savingSessionNote}>{savingSessionNote ? "Saving…" : "Save note"}</button></div>
-                    </form>}
                   </div>
                   <button type="button" className="btn btn-outline hx-download retention-export" onClick={() => void exportRetainedSession(session)} disabled={Boolean(exportingSessionId)} aria-label={`Download Excel recap for session ${session.meetingCode}, ended ${formatDate(session.endedAtMs)}`}>{exportingSessionId === session.id ? <><span className="loading-dot" aria-hidden="true" />Preparing</> : <><Download />Excel</>}</button>
+                  {editingNoteSessionId === session.id && <form className="hx-note-editor" onSubmit={event => { event.preventDefault(); void saveSessionNote(session); }}>
+                    <label htmlFor={`session-note-${session.id}`}>Session note <span>Optional · included in Excel recap</span></label>
+                    <textarea id={`session-note-${session.id}`} value={sessionNoteDraft} maxLength={160} rows={2} aria-describedby={`session-note-count-${session.id}`} onChange={event => setSessionNoteDraft(event.target.value)} onKeyDown={event => { if (event.key === "Escape") setEditingNoteSessionId(null); }} placeholder="Add a topic or short class summary" />
+                    <div className="hx-note-actions"><span id={`session-note-count-${session.id}`}>{sessionNoteDraft.length}/160</span><button type="button" className="btn btn-ghost" onClick={() => setEditingNoteSessionId(null)}>Cancel</button><button type="submit" className="btn btn-outline" disabled={savingSessionNote}>{savingSessionNote ? "Saving…" : "Save note"}</button></div>
+                  </form>}
                 </article>;
               })}</div>
             </section>)}</div>}
