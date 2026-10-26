@@ -445,6 +445,15 @@ export default function App() {
   const [editingNoteSessionId, setEditingNoteSessionId] = useState<string | null>(null);
   const [sessionNoteDraft, setSessionNoteDraft] = useState("");
   const [savingSessionNote, setSavingSessionNote] = useState(false);
+  // The note editor floats over the grid, so close it on any click or tap outside its card.
+  useEffect(() => {
+    if (!editingNoteSessionId) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(".hx-card.editing")) setEditingNoteSessionId(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePress);
+  }, [editingNoteSessionId]);
   const [sessionNoteMessage, setSessionNoteMessage] = useState("");
   const [historySort, setHistorySort] = useState<"newest" | "oldest">("newest");
   const [historyFilter, setHistoryFilter] = useState<"all" | "soon">("all");
@@ -1562,7 +1571,7 @@ export default function App() {
                 const expiresAt = session.endedAtMs + retentionMs;
                 const daysLeft = Math.max(0, Math.ceil((expiresAt - now) / dayMs));
                 const ended = new Date(session.endedAtMs);
-                return <article key={session.id} id={`hx-session-${session.id}`} role="listitem" aria-current={selectedHistoryId === session.id ? "true" : undefined} className={`hx-card${daysLeft <= 7 ? " soon" : ""}${selectedHistoryId === session.id ? " selected" : ""}`} style={{ "--i": index } as CSSProperties}>
+                return <article key={session.id} id={`hx-session-${session.id}`} role="listitem" aria-current={selectedHistoryId === session.id ? "true" : undefined} className={`hx-card${daysLeft <= 7 ? " soon" : ""}${selectedHistoryId === session.id ? " selected" : ""}${editingNoteSessionId === session.id ? " editing" : ""}`} style={{ "--i": index } as CSSProperties}>
                   <div className="hx-date" aria-hidden="true"><span className="hx-month">{ended.toLocaleDateString([], { month: "short" })}</span><span className="hx-day number">{ended.getDate()}</span><span className="hx-weekday">{ended.toLocaleDateString([], { weekday: "short" })}</span></div>
                   <div className="hx-card-main">
                     <span className="hx-code"><Video size={14} />{session.meetingCode}</span>
@@ -1571,9 +1580,9 @@ export default function App() {
                     <button type="button" className="btn btn-ghost hx-note-toggle" onClick={() => { setEditingNoteSessionId(editingNoteSessionId === session.id ? null : session.id); setSessionNoteDraft(session.sessionNote ?? ""); setSessionNoteMessage(""); }} aria-expanded={editingNoteSessionId === session.id} aria-label={`${session.sessionNote ? "Edit" : "Add"} note for ${session.meetingCode}`}><Pencil size={15} /><span>{session.sessionNote ? "Edit note" : "Add note"}</span></button>
                   </div>
                   <button type="button" className="btn btn-outline hx-download retention-export" onClick={() => void exportRetainedSession(session)} disabled={Boolean(exportingSessionId)} aria-label={`Download Excel recap for session ${session.meetingCode}, ended ${formatDate(session.endedAtMs)}`}>{exportingSessionId === session.id ? <><span className="loading-dot" aria-hidden="true" />Preparing</> : <><Download />Excel</>}</button>
-                  {editingNoteSessionId === session.id && <form className="hx-note-editor" onSubmit={event => { event.preventDefault(); void saveSessionNote(session); }}>
+                  {editingNoteSessionId === session.id && <form className="hx-note-editor" role="group" aria-label={`Note for ${session.meetingCode}`} onSubmit={event => { event.preventDefault(); void saveSessionNote(session); }}>
                     <label htmlFor={`session-note-${session.id}`}>Session note <span>Optional · included in Excel recap</span></label>
-                    <textarea id={`session-note-${session.id}`} value={sessionNoteDraft} maxLength={160} rows={2} aria-describedby={`session-note-count-${session.id}`} onChange={event => setSessionNoteDraft(event.target.value)} onKeyDown={event => { if (event.key === "Escape") setEditingNoteSessionId(null); }} placeholder="Add a topic or short class summary" />
+                    <textarea id={`session-note-${session.id}`} autoFocus value={sessionNoteDraft} maxLength={160} rows={2} aria-describedby={`session-note-count-${session.id}`} onChange={event => setSessionNoteDraft(event.target.value)} onKeyDown={event => { if (event.key === "Escape") setEditingNoteSessionId(null); }} placeholder="Add a topic or short class summary" />
                     <div className="hx-note-actions"><span id={`session-note-count-${session.id}`}>{sessionNoteDraft.length}/160</span><button type="button" className="btn btn-ghost" onClick={() => setEditingNoteSessionId(null)}>Cancel</button><button type="submit" className="btn btn-outline" disabled={savingSessionNote}>{savingSessionNote ? "Saving…" : "Save note"}</button></div>
                   </form>}
                 </article>;

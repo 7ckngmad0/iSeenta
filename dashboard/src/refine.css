@@ -142,7 +142,11 @@
 .hx-note-toggle { justify-self: start; min-height: 28px; padding: 3px 7px; color: var(--muted-foreground); font-size: 12px; }
 .hx-note-toggle svg { width: 14px; height: 14px; }
 .hx-session-note { margin: 2px 0 0; color: var(--foreground); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
-.hx-note-editor { grid-area: auto; grid-column: 1 / -1; display: grid; gap: 8px; margin-top: 0; padding: 11px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
+/* The editor is a popover anchored under its card, so opening it never moves the cards below. */
+.hx-card.editing { z-index: 30; border-color: var(--foreground); }
+.hx-note-editor { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 1; display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: 0 18px 40px -16px oklch(0 0 0 / .6); animation: note-pop .16s var(--ease-out) both; }
+@keyframes note-pop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .hx-note-editor { animation: none; } }
 .hx-note-editor > label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 600; }
 .hx-note-editor > label span, .hx-note-actions > span { color: var(--muted-foreground); font-size: 11px; font-weight: 400; }
 .hx-note-editor textarea { width: 100%; min-height: 54px; resize: vertical; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; font-size: 12px; }
