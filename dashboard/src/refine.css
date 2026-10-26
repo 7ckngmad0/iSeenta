@@ -160,8 +160,15 @@
 .hx-note-actions > span.near-limit { color: var(--idle-text); }
 .hx-note-editor .btn:disabled { opacity: .5; cursor: not-allowed; }
 /* The editor floats over the grid; saved notes use only the space their preview needs. */
-.hx-grid { align-items: start; }
-.hx-card { align-content: start; }
+/* Cards in a row share one height, so the date and Excel button line up with or without a note.
+   Text stays pinned to the top; the date and Excel button sit centred on the card. */
+.hx-grid { align-items: stretch; }
+.hx-card { align-content: stretch; }
+.hx-card-main { align-self: start; }
+.hx-note-links { flex-wrap: nowrap; gap: 2px; }
+.hx-note-view, .hx-note-toggle { white-space: nowrap; }
+.hx-meta { flex-wrap: wrap; row-gap: 2px; }
+.hx-meta > span { white-space: nowrap; }
 
 dialog.session-note-dialog { width: min(520px, calc(100% - 32px)); max-height: min(80vh, 560px); margin: auto; padding: 0; border: 1px solid color-mix(in oklch, var(--primary) 32%, var(--border)); border-radius: 14px; background: var(--card); color: var(--foreground); box-shadow: 0 24px 64px -20px oklch(0 0 0 / .78); }
 dialog.session-note-dialog[open] { animation: note-pop .16s var(--ease-out) both; }
